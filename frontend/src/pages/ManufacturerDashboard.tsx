@@ -16,6 +16,7 @@ const sidebarItems = [
 
 const ManufacturerDashboard = () => {
   const [batches, setBatches] = useState<any[]>([]);
+  const [tests, setTests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modal states
@@ -25,7 +26,7 @@ const ManufacturerDashboard = () => {
   const [formData, setFormData] = useState({
     batchId: `BAT-${Math.floor(Math.random() * 10000)}`,
     linkedCollectionIds: '',
-    linkedTestIds: 'TEST-NONE',
+    linkedTestIds: '',
     manufactureDate: new Date().toISOString().split('T')[0],
     expiryDate: new Date(Date.now() + 31536000000).toISOString().split('T')[0], // 1 year from now
     qrHash: 'QR_PENDING'
@@ -43,8 +44,12 @@ const ManufacturerDashboard = () => {
   const fetchBatches = async () => {
     try {
       const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-      const res = await axios.get(`${API_URL}/api/chain/all-batches`);
-      setBatches(res.data);
+      const [batchesRes, testsRes] = await Promise.all([
+        axios.get(`${API_URL}/api/chain/all-batches`),
+        axios.get(`${API_URL}/api/chain/all-tests`)
+      ]);
+      setBatches(batchesRes.data);
+      setTests(testsRes.data);
     } catch (err: any) {
       toast({
         variant: "destructive",
@@ -81,7 +86,8 @@ const ManufacturerDashboard = () => {
       setFormData({
         ...formData,
         batchId: `BAT-${Math.floor(Math.random() * 10000)}`,
-        linkedCollectionIds: ''
+        linkedCollectionIds: '',
+        linkedTestIds: ''
       });
       fetchBatches();
     } catch (err: any) {
@@ -197,8 +203,8 @@ const ManufacturerDashboard = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold">Linked Lab Test IDs</label>
-                    <input name="linkedTestIds" value={formData.linkedTestIds} onChange={handleFormChange} className="w-full h-10 px-3 bg-background border border-border rounded-lg outline-none focus:border-primary cursor-not-allowed text-muted-foreground" title="Lab tests not enabled in this demo" />
+                    <label className="text-sm font-semibold">Linked Lab Test IDs (comma separated)</label>
+                    <input name="linkedTestIds" value={formData.linkedTestIds} onChange={handleFormChange} placeholder="TEST-1234, TEST-5678" className="w-full h-10 px-3 bg-background border border-border rounded-lg outline-none focus:border-primary" />
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
@@ -242,6 +248,49 @@ const ManufacturerDashboard = () => {
                 <h3 className="text-3xl font-extrabold mt-1">{s.value} {s.unit && <span className="text-lg font-medium text-muted-foreground">{s.unit}</span>}</h3>
               </div>
             ))}
+          </div>
+
+          {/* Tests Table */}
+          <div className="bg-card rounded-xl border border-primary/10 shadow-sm overflow-hidden mb-8">
+            <div className="px-6 py-5 border-b border-primary/10 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold">Verified Lab Tests Available</h3>
+                <p className="text-sm text-muted-foreground mt-1">Include these Test IDs in your new batches to certify quality.</p>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              {!loading && tests.length > 0 ? (
+                <table className="w-full">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      {["Test ID", "Collection ID", "Lab Name", "Moisture", "Status"].map((h) => (
+                        <th key={h} className="px-6 py-4 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-primary/5">
+                    {tests.map((t: any) => (
+                      <tr key={t.testId} className="hover:bg-primary/5 transition-colors">
+                        <td className="px-6 py-4 font-mono text-sm text-primary font-bold">{t.testId}</td>
+                        <td className="px-6 py-4 font-mono text-sm font-medium">{t.collectionId}</td>
+                        <td className="px-6 py-4 text-sm">{t.labName}</td>
+                        <td className="px-6 py-4 text-sm font-medium">{t.moisturePercentage}%</td>
+                        <td className="px-6 py-4 text-sm">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${t.pesticideStatus === 'Passed' ? 'bg-emerald-100 text-emerald-700' :
+                              t.pesticideStatus === 'Warning' ? 'bg-orange-100 text-orange-700' :
+                                'bg-red-100 text-red-700'
+                            }`}>
+                            {t.pesticideStatus}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="p-8 text-center text-muted-foreground">No lab tests available.</div>
+              )}
+            </div>
           </div>
 
           {/* Batch Table */}
